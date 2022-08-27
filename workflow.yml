@@ -1,0 +1,59 @@
+name: CompatHelper
+on:
+  workflow_call:
+    inputs:
+      ### Optional inputs
+      cmd:
+        description: 'The CompatHelper command to run. If you provide this input, you MUST also provide the `compathelper_version` and `julia_version` inputs.'
+        required: false
+        default: 'CompatHelper.main()'
+      compathelper_version:
+        description: 'Version of CompatHelper.jl to use'
+        required: false
+        default: '3'
+      julia_version:
+        description: 'Julia version to use'
+        required: false
+        default: ''
+    secrets:
+      ### Required secrets
+      token:
+        description: 'A GitHub token with write access on your repository'
+        required: true
+      ### Optional secrets
+      ssh:
+        description: 'An SSH deploy key with write access on your repository'
+        required: false
+        default: ''
+jobs:
+  CompatHelper:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Julia (if the user set `julia_version`)
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: '${{ inputs.julia_version }}'
+        if: ${{ inputs.julia_version }} != ''
+      - name: "Add the General registry via Git"
+        run: |
+          import Pkg
+          ENV["JULIA_PKG_SERVER"] = ""
+          Pkg.Registry.add("General")
+          Pkg.Registry.update("General")
+        shell: julia --color=yes {0}
+      - name: "Install CompatHelper"
+        run: |
+          import Pkg
+          name = "CompatHelper"
+          uuid = "aa819f21-2bde-4658-8897-bab36330d9b7"
+          version = "${{ inputs.compathelper_version }}"
+          Pkg.add(; name, uuid, version)
+        shell: julia --color=yes {0}
+      - name: "Run CompatHelper"
+        run: |
+          import CompatHelper
+          ${{ inputs.cmd }}
+        shell: julia --color=yes {0}
+        env:
+          GITHUB_TOKEN: ${{ secrets.token }}
+          COMPATHELPER_PRIV: ${{ secrets.ssh }}
